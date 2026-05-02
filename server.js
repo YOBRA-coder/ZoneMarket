@@ -51,7 +51,7 @@ const MPESA_SHORTCODE = process.env.MPESA_SHORTCODE || '174379';
 const MPESA_PASSKEY = process.env.MPESA_PASSKEY || '';
 const MPESA_CALLBACK_URL = process.env.MPESA_CALLBACK_URL || 'https://your-domain.com/api/v1/wallet/mpesa/callback';
 
-mongoose.connect('mongodb+srv://brianrotich909_db_user:R86q2IGJdyWj777t@cluster0.3iyvfrr.mongodb.net/?appName=Cluster0')
+mongoose.connect(process.env.MONGO_URI)
 //mongodb://127.0.0.1:27017/zonemarket?directConnection=true
 //mongodb+srv://brianrotich909_db_user:R86q2IGJdyWj777t@cluster0.3iyvfrr.mongodb.net/?appName=Cluster0
 // ─── MODELS ─────────────────────────────────────────────────────────
