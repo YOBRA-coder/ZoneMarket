@@ -117,7 +117,7 @@ const VariantSchema = new mongoose.Schema({
   },
   price: { type: Number, required: true },
   originalPrice: Number, // Ili uweze kuweka discount hadi kwenye kiwango cha variant
-  stock: { ype: Number, default: 0 }
+  stock: { type: Number, default: 0 }
 });
 
 const ProductSchema = new mongoose.Schema({
