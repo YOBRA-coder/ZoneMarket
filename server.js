@@ -200,7 +200,7 @@ const Transaction = mongoose.model('Transaction', TransactionSchema);
 const Comment = mongoose.model('Comment', CommentSchema);
 const Notification = mongoose.model('Notification', NotificationSchema);
 const Category = mongoose.model('Category', CategorySchema);
-
+const Variant = mongoose.model('Variants', VariantSchema);
 // ─── MIDDLEWARE ──────────────────────────────────────────────────────
 
 const auth = (roles = []) => async (req, res, next) => {
