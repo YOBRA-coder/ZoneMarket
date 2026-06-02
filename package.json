@@ -9,7 +9,7 @@
     "seed": "node scripts/seed.js"
   },
   "keywords": [],
-  "author": "",
+  "author": "yobra",
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
