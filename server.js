@@ -364,12 +364,16 @@ app.get('/api/v1/products', auth(), async (req, res) => {
 app.get('/api/v1/products/:id', auth(), async (req, res) => {
   const p = await Product.findById(req.params.id).populate('managerId', 'name').populate('zoneId', 'name');
   if (!p) return res.status(404).json({ message: 'Product not found' });
-  res.json({ ...p.toObject(), liked: p.likes.some(id => id.equals(req.user._id)), likesCount: p.likes.length, managerName: p.managerId?.name, zoneName: p.zoneId?.name });
+  res.json({ ...p.toObject(), liked: p.likes.some(id => id.equals(req.user._id)), likesCount: p.likes.length, managerName: p.managerId?.name, zoneName: p.zoneId?.name, hasVariants: p.hasVariants, variants: p.variants });
 });
 
 app.post('/api/v1/products', auth(['manager', 'admin']), async (req, res) => {
   console.log(req.body);
   const product = await Product.create({ ...req.body, managerId: req.user._id, zoneId: req.user.zoneId });
+  const variants = req.body.variants || [];
+  if (req.body.hasVariants && variants.length > 0) {
+    await Promise.all(variants.map(v => Variant.create({ ...v, productId: product._id })));
+  }
   res.status(201).json(product);
 });
 
