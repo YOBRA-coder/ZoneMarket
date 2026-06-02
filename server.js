@@ -110,6 +110,16 @@ const NotificationSchema = new mongoose.Schema({
   createdAt: { type: Date, default: Date.now }
 }, { timestamps: true });
 
+const VariantSchema = new mongoose.Schema({
+  formatType: { type: String, required: true,  enum: ['grams', 'blunts'] // Inaruhusu 'grams' au 'blunts' pekee
+  },
+  measurementLabel: { type: String, required: true // Mfano: "1 Gram", "3 Grams", "1 Pre-Roll Blunt"
+  },
+  price: { type: Number, required: true },
+  originalPrice: Number, // Ili uweze kuweka discount hadi kwenye kiwango cha variant
+  stock: { ype: Number, default: 0 }
+});
+
 const ProductSchema = new mongoose.Schema({
   name: { type: String, required: true },
   description: String,
@@ -132,15 +142,7 @@ const ProductSchema = new mongoose.Schema({
   variants: [VariantSchema]
 }, { timestamps: true });
 
-const VariantSchema = new mongoose.Schema({
-  formatType: { type: String, required: true,  enum: ['grams', 'blunts'] // Inaruhusu 'grams' au 'blunts' pekee
-  },
-  measurementLabel: { type: String, required: true // Mfano: "1 Gram", "3 Grams", "1 Pre-Roll Blunt"
-  },
-  price: { type: Number, required: true },
-  originalPrice: Number, // Ili uweze kuweka discount hadi kwenye kiwango cha variant
-  stock: { ype: Number, default: 0 }
-});
+
 
 const OrderSchema = new mongoose.Schema({
   reference: { type: String, unique: true },
