@@ -479,7 +479,7 @@ app.get('/api/v1/orders/manager/:managerId', auth(['manager', 'admin']), async (
 });
 
 app.get('/api/v1/orders/client/:clientId', auth(), async (req, res) => {
-  const orders = await Order.find({ clientId: req.params.clientId }).sort({ createdAt: -1 });
+  const orders = await Order.find({ clientId: req.params.clientId, zoneId: req.user.zoneId }).sort({ createdAt: -1 });
   res.json({ orders: orders.map(o => ({ ...o.toObject(), itemCount: o.items?.length || 0 })) });
 });
 
