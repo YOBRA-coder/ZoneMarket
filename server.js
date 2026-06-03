@@ -107,6 +107,7 @@ const NotificationSchema = new mongoose.Schema({
     readAt: Date
   }],
   recipientRole: [{ type: String, enum: ['admin', 'manager', 'client'] }],
+  zoneId: { type: mongoose.Schema.Types.ObjectId, ref: 'Zone' },
   createdAt: { type: Date, default: Date.now }
 }, { timestamps: true });
 
@@ -117,7 +118,7 @@ const VariantSchema = new mongoose.Schema({
   },
   price: { type: Number, required: true },
   originalPrice: Number, // Ili uweze kuweka discount hadi kwenye kiwango cha variant
-  stock: { type: Number, default: 0 }
+  stock: { type: Number, default: 0 },
 });
 
 const ProductSchema = new mongoose.Schema({
@@ -184,6 +185,7 @@ const TransactionSchema = new mongoose.Schema({
   method: { type: String, enum: ['wallet', 'mpesa', 'bank', 'cash'] },
   mpesaRef: String,
   orderId: { type: mongoose.Schema.Types.ObjectId, ref: 'Order' },
+  zoneId: { type: mongoose.Schema.Types.ObjectId, ref: 'Zone' },
 }, { timestamps: true });
 
 const CommentSchema = new mongoose.Schema({
@@ -449,6 +451,7 @@ app.post('/api/v1/orders', auth(['client']), async (req, res) => {
       { user: manager?._id, isRead: false }
     ],
     recipientRole: ["client", "manager", "admin"],
+    zoneId: req.user.zoneId,
   });
   await newNotification.save();
   // Notify manager
@@ -602,8 +605,8 @@ app.put('/api/v1/orders/:id/status', auth(['manager', 'admin']), async (req, res
     const admin = await User.findOne({ role: 'admin' });
     if (admin) await User.findByIdAndUpdate(admin._id, { $inc: { adminCommission: order.adminCommission } });
 
-    await Transaction.create({ userId: order.managerId, type: 'earning', amount: order.managerEarning, description: `Earning from order ${order.reference}`, status: 'completed', orderId: order._id });
-    await Transaction.create({ userId: admin._id, type: 'commission', amount: order.adminCommission, description: `Commission from order ${order.reference}`, status: 'completed', orderId: order._id });
+    await Transaction.create({ userId: order.managerId, type: 'earning', amount: order.managerEarning, description: `Earning from order ${order.reference}`, status: 'completed', orderId: order._id, zoneId: order.zoneId });
+    await Transaction.create({ userId: admin._id, type: 'commission', amount: order.adminCommission, description: `Commission from order ${order.reference}`, status: 'completed', orderId: order._id, zoneId: order.zoneId });
   }
 
   io.to(order.clientId.toString()).emit('order_update', { orderId: order._id, status, reference: order.reference });
@@ -637,6 +640,7 @@ app.put('/api/v1/orders/:id/status', auth(['manager', 'admin']), async (req, res
       { user: order.clientId, isRead: false },
     ],
     recipientRole: ['client', 'manager', 'admin'],
+    zoneId: order.zoneId,
   });
   await newNotification.save();
 
@@ -666,7 +670,7 @@ app.get('/api/v1/wallet/balance', auth(), async (req, res) => {
 app.get('/api/v1/wallet/transactions', auth(), async (req, res) => {
   const page = parseInt(req.query.page) || 1;
   const limit = parseInt(req.query.limit) || 20;
-  const txns = await Transaction.find({ userId: req.user._id }).sort({ createdAt: -1 }).skip((page - 1) * limit).limit(limit);
+  const txns = await Transaction.find({ userId: req.user._id, zoneId: req.user.zoneId }).sort({ createdAt: -1 }).skip((page - 1) * limit).limit(limit);
   res.json({ transactions: txns, page });
 });
 
@@ -679,7 +683,7 @@ app.post('/api/v1/wallet/deposit', auth(), async (req, res) => {
     try {
       const stkRes = await initiateStkPush(phone, amount, null);
       console.log('STK Response:', stkRes);
-      const txn = await Transaction.create({ userId: req.user._id, type: 'deposit', amount, method: 'mpesa', status: 'pending', description: `M-Pesa deposit KSh ${amount}`, reference: stkRes.CheckoutRequestID });
+      const txn = await Transaction.create({ userId: req.user._id, type: 'deposit', amount, method: 'mpesa', status: 'pending', description: `M-Pesa deposit KSh ${amount}`, reference: stkRes.CheckoutRequestID, zoneId: req.user.zoneId });
       return res.json({ pending: true, transactionId: txn._id, checkoutRequestId: stkRes.CheckoutRequestID, message: 'STK Push sent to your phone' });
     } catch (e) {
       res.status(500).json({ message: 'Error Processing transaction. Try again later.' });
@@ -688,7 +692,7 @@ app.post('/api/v1/wallet/deposit', auth(), async (req, res) => {
   }
   // Direct deposit (bank/card after verification)
   await User.findByIdAndUpdate(req.user._id, { $inc: { walletBalance: amount } });
-  await Transaction.create({ userId: req.user._id, type: 'deposit', amount, method, status: 'completed', description: `Deposit KSh ${amount}` });
+  await Transaction.create({ userId: req.user._id, type: 'deposit', amount, method, status: 'completed', description: `Deposit KSh ${amount}`, zoneId: req.user.zoneId });
   const uForPush = await User.findById(req.user._id).select('pushToken');
   if (uForPush?.pushToken) push.notifyDepositConfirmed(uForPush.pushToken, amount);
   res.json({ success: true, newBalance: (await User.findById(req.user._id)).walletBalance });
@@ -729,6 +733,7 @@ app.post('/api/v1/wallet/mpesa/callback', async (req, res) => {
         body: `Your deposit of KSh ${txn.amount} has been confirmed (${txn.status}).`,
         recipients: [{ user: txn.userId, isRead: false }],
         recipientRole: ['client', 'manager', 'admin'],
+        zoneId: req.user.zoneId,
       });
 
     }
@@ -746,6 +751,7 @@ app.post('/api/v1/wallet/mpesa/callback', async (req, res) => {
         body: `Your payment of KSh ${txn.amount} has been confirmed (${txn.status}).`,
         recipients: [{ user: txn.userId, isRead: false }],
         recipientRole: ['client', 'manager', 'admin'],
+        zoneId: req.user.zoneId,
       });
     }
 
@@ -763,6 +769,7 @@ app.post('/api/v1/wallet/mpesa/callback', async (req, res) => {
     body: `Your ${txn.type === 'order_payment' ? 'payment' : 'deposit'} of KSh ${txn.amount} has been confirmed status - ${txn.status}.`,
     recipients: [{ user: txn.userId, isRead: false }],
     recipientRole: ['client', 'manager', 'admin'],
+    zoneId: req.user.zoneId,
   });
   res.json({ ResultCode: 0, ResultDesc: 'Accepted' });
 });
@@ -809,7 +816,7 @@ app.post('/api/v1/wallet/pay-order', auth(), async (req, res) => {
       }
     await User.findByIdAndUpdate(req.user._id, { $inc: { walletBalance: -order.total } });
     await Order.findByIdAndUpdate(orderId, { paymentStatus: 'paid' });
-    await Transaction.create({ userId: req.user._id, type: 'order_payment', amount: -order.total, method: 'wallet', status: 'completed', orderId, description: `Payment for order ${order.reference}` });
+    await Transaction.create({ userId: req.user._id, type: 'order_payment', amount: -order.total, method: 'wallet', status: 'completed', orderId, description: `Payment for order ${order.reference}, zone: ${order.zoneId}`, zoneId: req.user.zoneId });
     const userForPush = await User.findById(req.user._id).select('pushToken');
     if (userForPush?.pushToken) push.notifyClientPaymentSuccess(userForPush.pushToken, order.reference, order.total);
     return res.json({ success: true, message: 'Order Payment Successful - Wallet' });
@@ -845,7 +852,7 @@ app.post('/api/v1/wallet/pay-order', auth(), async (req, res) => {
     // Integrate card payment gateway here (e.g. Stripe, PayPal)
     // For now, just return success for testing
     await Order.findByIdAndUpdate(orderId, { paymentStatus: 'paid' });
-    await Transaction.create({ userId: req.user._id, type: 'order_payment', amount: -order.total, method: 'card', status: 'completed', orderId, description: `Card payment for order ${order.reference}` });
+    await Transaction.create({ userId: req.user._id, type: 'order_payment', amount: -order.total, method: 'card', status: 'completed', orderId, description: `Card payment for order ${order.reference}, zone: ${order.zoneId}`, zoneId: req.user.zoneId });
     const userForPush = await User.findById(req.user._id).select('pushToken');
     if (userForPush?.pushToken) push.notifyClientPaymentSuccess(userForPush.pushToken, order.reference, order.total);
     return res.json({ success: true, message: 'Order Payment Successful - Card' }); 
@@ -983,7 +990,7 @@ app.delete('/api/v1/clients/:id', auth(['manager', 'admin']), async (req, res) =
 
 app.get('/api/v1/notifications', auth(), async (req, res) => {
   // Return all notifications for now
-  const notifications = await Notification.find({ "recipients.user": req.user.id }).sort({ createdAt: -1 });
+  const notifications = await Notification.find({ "recipients.user": req.user.id, zoneId: req.user.zoneId }).sort({ createdAt: -1 });
   res.json(notifications);
 });
 
