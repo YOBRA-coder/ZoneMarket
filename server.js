@@ -463,9 +463,12 @@ app.post('/api/v1/orders', auth(['client']), async (req, res) => {
 });
 
 app.get('/api/v1/orders/:id', auth(), async (req, res) => {
-  const order = await Order.findById(req.params.id, req.user.zoneId)
-    .populate('clientId', 'name phone')
-    .populate('managerId', 'name phone');
+const order = await Order.findOne({
+  _id: req.params.id,
+  zoneId: req.user.zoneId,
+})
+  .populate('clientId', 'name phone')
+  .populate('managerId', 'name phone');
   if (!order) return res.status(404).json({ message: 'Order not found' });
   res.json({ ...order.toObject(), clientName: order.clientId?.name, clientPhone: order.clientId?.phone });
 });
