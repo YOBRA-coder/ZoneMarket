@@ -151,7 +151,7 @@ const OrderSchema = new mongoose.Schema({
   zoneId: { type: mongoose.Schema.Types.ObjectId, ref: 'Zone' },
   items: [{
     productId: { type: mongoose.Schema.Types.ObjectId, ref: 'Product' },
-    name: String, price: Number, quantity: Number,
+    name: String, price: Number, quantity: Number, variantId: { type: mongoose.Schema.Types.ObjectId, ref: 'Variants' }
   }],
   subtotal: Number,
   deliveryFee: { type: Number, default: 50 },
@@ -165,11 +165,12 @@ const OrderSchema = new mongoose.Schema({
   },
   paymentMethod: { type: String, enum: ['wallet', 'mpesa', 'cash', 'bank'] },
   paymentStatus: { type: String, enum: ['pending', 'paid', 'failed'], default: 'pending' },
-  deliveryLocation: { lat: Number, lng: Number, address: String },
+  deliveryLocation: { lat: Number, lng: Number, address: String, distance: Number, zoneType: String },
   trackingUpdates: [{ status: String, time: Date, note: String }],
   estimatedDelivery: Date,
   deliveredAt: Date,
   cancelReason: String,
+  variantId: { type: mongoose.Schema.Types.ObjectId, ref: 'Variants' }, // for products with variants
 }, { timestamps: true });
 
 const TransactionSchema = new mongoose.Schema({
@@ -414,9 +415,8 @@ app.post('/api/v1/products/:id/comments', auth(), async (req, res) => {
 // ─── ORDERS ──────────────────────────────────────────────────────────
 
 app.post('/api/v1/orders', auth(['client']), async (req, res) => {
-  const { items, deliveryLocation, paymentMethod } = req.body;
+  const { items, deliveryLocation, paymentMethod, deliveryFee, notes } = req.body;
   const subtotal = items.reduce((s, i) => s + i.price * i.quantity, 0);
-  const deliveryFee = 50;
   const total = subtotal + deliveryFee;
   const adminCommission = total * ADMIN_COMMISSION_RATE;
   const managerEarning = total - adminCommission;
@@ -756,6 +756,7 @@ app.post('/api/v1/wallet/mpesa/callback', async (req, res) => {
   } else {
     txn.status = 'failed';
     await txn.save();
+    await Order.findOneAndDelete({ _id: txn.orderId, status: 'pending' });
   }
   Notification.create({
     title: txn.type === 'order_payment' ? 'Payment Received' : 'Deposit Confirmed',
@@ -841,7 +842,16 @@ app.post('/api/v1/wallet/pay-order', auth(), async (req, res) => {
       console.log(e);
       res.status(500).json({ message: 'Payment failed' });
     }
-  } else {
+  } else if(method === 'card') {
+    // Integrate card payment gateway here (e.g. Stripe, PayPal)
+    // For now, just return success for testing
+    await Order.findByIdAndUpdate(orderId, { paymentStatus: 'paid' });
+    await Transaction.create({ userId: req.user._id, type: 'order_payment', amount: -order.total, method: 'card', status: 'completed', orderId, description: `Card payment for order ${order.reference}` });
+    const userForPush = await User.findById(req.user._id).select('pushToken');
+    if (userForPush?.pushToken) push.notifyClientPaymentSuccess(userForPush.pushToken, order.reference, order.total);
+    return res.json({ success: true, message: 'Order Payment Successful - Card' }); 
+  
+}else if(method === 'cash') {
     return res.status(400).json({ message: 'Comming soon' });
   }
 });
