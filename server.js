@@ -369,7 +369,6 @@ app.get('/api/v1/products/:id', auth(), async (req, res) => {
 });
 
 app.post('/api/v1/products', auth(['manager', 'admin']), async (req, res) => {
-  console.log(req.body);
   const product = await Product.create({ ...req.body, managerId: req.user._id, zoneId: req.user.zoneId });
   const variants = req.body.variants || [];
   if (req.body.hasVariants && variants.length > 0) {
@@ -461,7 +460,7 @@ app.post('/api/v1/orders', auth(['client']), async (req, res) => {
 });
 
 app.get('/api/v1/orders/:id', auth(), async (req, res) => {
-  const order = await Order.findById(req.params.id)
+  const order = await Order.findById(req.params.id, req.user.zoneId)
     .populate('clientId', 'name phone')
     .populate('managerId', 'name phone');
   if (!order) return res.status(404).json({ message: 'Order not found' });
