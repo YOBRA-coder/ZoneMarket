@@ -61,7 +61,7 @@ const UserSchema = new mongoose.Schema({
   email: { type: String, required: true, unique: true },
   password: { type: String, required: true },
   phone: { type: String },
-  role: { type: String, enum: ['admin', 'manager', 'client'], required: true },
+  role: { type: String, enum: ['admin', 'manager', 'client', 'rider'], required: true },
   zoneId: { type: mongoose.Schema.Types.ObjectId, ref: 'Zone' },
   walletBalance: { type: Number, default: 0 },
   adminCommission: { type: Number, default: 0 }, // admin only
@@ -106,7 +106,7 @@ const NotificationSchema = new mongoose.Schema({
     isRead: { type: Boolean, default: false },
     readAt: Date
   }],
-  recipientRole: [{ type: String, enum: ['admin', 'manager', 'client'] }],
+  recipientRole: [{ type: String, enum: ['admin', 'manager', 'client', 'rider'] }],
   zoneId: { type: mongoose.Schema.Types.ObjectId, ref: 'Zone' },
   createdAt: { type: Date, default: Date.now }
 }, { timestamps: true });
@@ -450,7 +450,7 @@ app.post('/api/v1/orders', auth(['client']), async (req, res) => {
       { user: req.user_id, isRead: false },
       { user: manager?._id, isRead: false }
     ],
-    recipientRole: ["client", "manager", "admin"],
+    recipientRole: ["client", "manager", "admin", "rider"],
     zoneId: req.user.zoneId,
   });
   await newNotification.save();
@@ -473,7 +473,7 @@ const order = await Order.findOne({
   res.json({ ...order.toObject(), clientName: order.clientId?.name, clientPhone: order.clientId?.phone });
 });
 
-app.get('/api/v1/orders/manager/:managerId', auth(['manager', 'admin']), async (req, res) => {
+app.get('/api/v1/orders/manager/:managerId', auth(['manager', 'admin', 'rider']), async (req, res) => {
   const orders = await Order.find({ managerId: req.params.managerId }).sort({ createdAt: -1 }).populate('clientId', 'name phone');
   res.json({ orders: orders.map(o => ({ ...o.toObject(), clientName: o.clientId?.name, itemCount: o.items?.length || 0, timeAgo: getTimeAgo(o.createdAt) })) });
 });
@@ -490,7 +490,7 @@ app.put('/api/v1/orders/:id/cancel', auth(), async (req,res) => {
   console.log('order cancelled success'+newOrder);
   return res.json({success: true, newOrder})
 })
-app.get('/api/v1/orders/top-products/:zoneId', auth(['manager', 'admin']), async (req, res) => {
+app.get('/api/v1/orders/top-products/:zoneId', auth(['manager', 'admin', 'rider']), async (req, res) => {
   try{
   const topProducts = await Order.aggregate([
   { $match: { status: 'delivered' } }, // only completed orders
@@ -513,7 +513,7 @@ app.get('/api/v1/orders/top-products/:zoneId', auth(['manager', 'admin']), async
 }
 });
 
-app.get('/api/v1/orders/weekly-stats/:zoneId', auth(['manager', 'admin']), async (req, res) => {
+app.get('/api/v1/orders/weekly-stats/:zoneId', auth(['manager', 'admin', 'rider']), async (req, res) => {
   try{
 const startOfWeek = new Date();
 startOfWeek.setHours(0, 0, 0, 0);
@@ -556,7 +556,7 @@ console.log(`Weekly stats: ${weeklyStats.length}`);
 }
 });
 
-app.get('/api/v1/orders/monthly-stats/:zoneId', auth(['manager', 'admin']), async (req, res) => {
+app.get('/api/v1/orders/monthly-stats/:zoneId', auth(['manager', 'admin', 'rider']), async (req, res) => {
   try{
     const now = new Date();
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -894,7 +894,7 @@ app.post('/api/v1/managers/:id/activate', auth(['admin']), async (req, res) => {
   await User.findByIdAndUpdate(req.params.id, { isActive: true });
   res.json({ success: true });
 });
-app.get('/api/v1/managers/:id/sales', auth(['admin']), async (req, res) => {
+app.get('/api/v1/managers/:id/sales', auth(['admin', 'manager']), async (req, res) => {
   const { from, to } = req.query;
   const orders = await Order.find({ managerId: req.params.id, status: 'delivered', createdAt: { $gte: new Date(from), $lte: new Date(to) } });
   const totalRevenue = orders.reduce((s, o) => s + o.total, 0);
@@ -954,6 +954,16 @@ app.post('/api/v1/clients', auth(['manager']), async (req, res) => {
     if (await User.findOne({ email })) return res.status(400).json({ message: 'Email already exists' });
     const hashed = await bcrypt.hash(address, 12);
     const user = await User.create({ name, email: email.toLowerCase(), password: hashed, phone, role: 'client', zoneId, createdBy: req.user._id });
+    res.status(201).json({ id: user._id, name: user.name, email: user.email, role: user.role });
+  } catch (e) { res.status(500).json({ message: e.message }); }
+});
+
+app.post('/api/v1/riders', auth(['manager']), async (req, res) => {
+  try {
+    const { name, email, address, phone, zoneId } = req.body;
+    if (await User.findOne({ email })) return res.status(400).json({ message: 'Email already exists' });
+    const hashed = await bcrypt.hash(address, 12);
+    const user = await User.create({ name, email: email.toLowerCase(), password: hashed, phone, role: 'rider', zoneId, createdBy: req.user._id });
     res.status(201).json({ id: user._id, name: user.name, email: user.email, role: user.role });
   } catch (e) { res.status(500).json({ message: e.message }); }
 });
