@@ -960,10 +960,10 @@ app.post('/api/v1/clients', auth(['manager']), async (req, res) => {
 
 app.post('/api/v1/riders', auth(['manager']), async (req, res) => {
   try {
-    const { name, email, address, phone, zoneId } = req.body;
+    const { name, email, password, phone, zoneId, userName } = req.body;
     if (await User.findOne({ email })) return res.status(400).json({ message: 'Email already exists' });
-    const hashed = await bcrypt.hash(address, 12);
-    const user = await User.create({ name, email: email.toLowerCase(), password: hashed, phone, role: 'rider', zoneId, createdBy: req.user._id });
+    const hashed = await bcrypt.hash(password, 12);
+    const user = await User.create({ name, email: email.toLowerCase(), password: hashed, phone, role: 'rider', zoneId, createdBy: req.user._id, userName: userName || email.split('@')[0] });
     res.status(201).json({ id: user._id, name: user.name, email: user.email, role: user.role });
   } catch (e) { res.status(500).json({ message: e.message }); }
 });
