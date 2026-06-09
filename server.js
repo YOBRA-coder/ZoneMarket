@@ -149,6 +149,7 @@ const OrderSchema = new mongoose.Schema({
   reference: { type: String, unique: true },
   clientId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   managerId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  raiderId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   zoneId: { type: mongoose.Schema.Types.ObjectId, ref: 'Zone' },
   items: [{
     productId: { type: mongoose.Schema.Types.ObjectId, ref: 'Product' },
@@ -958,7 +959,30 @@ app.post('/api/v1/clients', auth(['manager']), async (req, res) => {
   } catch (e) { res.status(500).json({ message: e.message }); }
 });
 
-app.post('/api/v1/riders', auth(['manager']), async (req, res) => {
+app.get('/api/v1/raiders', auth(['manager', 'admin']), async (req, res) => {
+  const filter = { role: 'rider' };
+  if(req.user._id){
+    filter.isVerified = 'true';
+  }
+  if (req.query.managerId) {
+    const orders = await Order.distinct('clientId', { managerId: req.query.managerId });
+    filter._id = { $in: orders };
+  }
+  const riders = await User.find(filter).select('-password');
+  const result = await Promise.all(riders.map(async c => {
+    const orderCount = await Order.countDocuments({ clientId: c._id });
+    return { id: c._id, name: c.name, email: c.email, phone: c.phone, zoneId: c.zoneId, walletBalance: c.walletBalance, orderCount, isVerified: c.isVerified, isAdminVerified: c.isAdminVerified, isManagerVerified: c.isManagerVerified };
+  }));
+  res.json(result);
+});
+
+app.get('/api/v1/raiders/:id', auth(['manager', 'admin']), async (req, res) => {
+  const m = await User.findById(req.params.id).populate('zoneId', 'name');
+  if (!m) return res.status(404).json({ message: 'Rider not found' });
+  res.json({ id: m._id, name: m.name, email: m.email, phone: m.phone, zone: m.zoneId, balance: m.walletBalance, isVerified: m.isVerified, isAdminVerified: m.isAdminVerified, isManagerVerified: m.isManagerVerified });
+});
+
+app.post('/api/v1/raiders', auth(['manager']), async (req, res) => {
   try {
     const { name, email, password, phone, zoneId, userName } = req.body;
     if (await User.findOne({ email })) return res.status(400).json({ message: 'Email already exists' });
