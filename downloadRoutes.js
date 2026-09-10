@@ -92,5 +92,17 @@ router.post('/verify', async (req, res) => {
   }
 });
 
+// all downloads
+
+router.get('/downloads', async (req, res) => {
+  try {
+    const downloads = await Download.find().sort({ downloadedAt: -1 });
+    res.json({ downloads: downloads });
+  } catch (err) {
+    console.error('Error fetching downloads:', err);
+    res.status(500).json({ error: 'Could not fetch downloads' });
+  }
+});
+
 
 module.exports = router;

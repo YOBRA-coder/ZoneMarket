@@ -17,6 +17,18 @@ async function seed() {
   //console.log('🗑️  Database cleared');
 
   const User    = mongoose.model('User',    UserSchema);
+  const updatedUser = await User.findOneAndUpdate(
+      { email: 'Admins@zone' },
+      { role: 'admin' }, // Change 'type' to your specific field name if different
+      { new: true }
+  );
+
+  if (updatedUser) {
+      console.log(`Success! User ${userEmail} is now an admin.`);
+      console.log(updatedUser);
+  } else {
+      console.log('User not found. Please check the email address.');
+  }
  // const Zone    = mongoose.model('Zone',    ZoneSchema);
  // const Product = mongoose.model('Product', ProductSchema);
 
