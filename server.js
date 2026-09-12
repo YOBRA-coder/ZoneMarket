@@ -178,7 +178,9 @@ const OrderSchema = new mongoose.Schema({
   estimatedDelivery: Date,
   deliveredAt: Date,
   cancelReason: String,
-  variantId: { type: mongoose.Schema.Types.ObjectId, ref: 'Variants' }, // for products with variants
+  variantId: { type: mongoose.Schema.Types.ObjectId, ref: 'Variants' },
+  stationId: { type: mongoose.Schema.Types.ObjectId, ref: 'PickupStation' },
+  fullfillmentType: { type: String, enum: ['delivery', 'pickup'], default: 'delivery' },
 }, { timestamps: true });
 
 const TransactionSchema = new mongoose.Schema({
@@ -320,7 +322,7 @@ app.get('/api/v1/zones/nearby', auth(), async (req, res) => {
 // pickup-stations
 // Added try-catch for error safety
 app.get('/api/v1/pickup-stations', auth(), async (req, res) => {
-  try {
+  try { 
     const filter = { isActive: true };
     if (req.query.zoneId) filter.zoneId = req.query.zoneId;
 
@@ -462,7 +464,7 @@ app.post('/api/v1/products/:id/comments', auth(), async (req, res) => {
 // ─── ORDERS ──────────────────────────────────────────────────────────
 
 app.post('/api/v1/orders', auth(['client']), async (req, res) => {
-  const { items, deliveryLocation, paymentMethod, deliveryFee, notes } = req.body;
+  const { items, deliveryLocation, paymentMethod, deliveryFee, fulfillmentType, stationId } = req.body;
   const subtotal = items.reduce((s, i) => s + i.price * i.quantity, 0);
   const total = subtotal + deliveryFee;
   const adminCommission = total * ADMIN_COMMISSION_RATE;
@@ -487,6 +489,7 @@ app.post('/api/v1/orders', auth(['client']), async (req, res) => {
     adminCommission, managerEarning, riderEarning, paymentMethod, deliveryLocation,
     estimatedDelivery: new Date(Date.now() + 35 * 60000),
     trackingUpdates: [{ status: 'pending', time: new Date(), note: 'Order placed' }],
+    stationId: stationId || null, fullfillmentType: fulfillmentType || 'delivery'
   });
   updateReferralActivity(req.user._id); // Update referral activity for the client
 
