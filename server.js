@@ -318,13 +318,24 @@ app.get('/api/v1/zones/nearby', auth(), async (req, res) => {
 });
 
 // pickup-stations
-app.get('/api/v1/pickup-stations', async (req, res) => {
-  const filter = { isActive: false };
-  if (req.query.zoneId) filter.zoneId = req.query.zoneId;
-  const pickupStations = await PickupStation.find(filter).sort({ createdAt: -1 });
- console.log(pickupStations);
-  res.json(pickupStations);
+// Added try-catch for error safety
+app.get('/api/v1/pickup-stations', auth(), async (req, res) => {
+  try {
+    const filter = { isActive: true };
+    if (req.query.zoneId) filter.zoneId = req.query.zoneId;
+
+    const pickupStations = await PickupStation.find(filter).sort({ createdAt: -1 });
+    
+    // Optional: safe cleanup of console logs in production
+    console.log(pickupStations); 
+    
+    res.json(pickupStations);
+  } catch (error) {
+    console.error("Error fetching pickup stations:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
 });
+
 
 app.post('/api/v1/pickup-stations', auth(['manager']), async (req, res) => {
   const pickupStation = await PickupStation.create({ ...req.body, managerId: req.user._id, zoneId: req.user.zoneId, isActive: true });
