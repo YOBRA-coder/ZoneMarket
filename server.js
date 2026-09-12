@@ -81,6 +81,14 @@ const ZoneSchema = new mongoose.Schema({
   adminId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
 }, { timestamps: true });
 
+const PickupStationSchema = new mongoose.Schema({
+  title: { type: String, required: true },
+  description: String,
+  location: { lat: Number, lng: Number },
+  zoneId: { type: mongoose.Schema.Types.ObjectId, ref: 'Zone' },
+  managerId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+}, { timestamps: true });
+
 const CategorySchema = new mongoose.Schema({
   name: { type: String, required: true },
   description: String,
@@ -197,6 +205,7 @@ const CommentSchema = new mongoose.Schema({
 
 const User = mongoose.model('User', UserSchema);
 const Zone = mongoose.model('Zone', ZoneSchema);
+const PickupStation = mongoose.model('PickupStation', PickupStationSchema);
 const Product = mongoose.model('Product', ProductSchema);
 const Order = mongoose.model('Order', OrderSchema);
 const Transaction = mongoose.model('Transaction', TransactionSchema);
@@ -306,6 +315,18 @@ app.get('/api/v1/zones/nearby', auth(), async (req, res) => {
   const zones = await Zone.find({ isActive: true });
   res.json(zones);
 });
+
+// pickup-stations
+app.get('/api/v1/pickup-stations', async (req, res) => {
+  const pickupStations = await PickupStation.find().populate('zoneId', 'name').populate('managerId', 'name');
+  res.json(pickupStations);
+});
+
+app.post('/api/v1/pickup-stations', auth(['manager']), async (req, res) => {
+  const pickupStation = await PickupStation.create({ ...req.body, managerId: req.user._id, zoneId: req.user.zoneId });
+  res.status(201).json(pickupStation);
+});
+
 
 // User changes zone (location tracking)
 app.post('/api/v1/zones/user/:userId/update-location', auth(), async (req, res) => {
