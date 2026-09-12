@@ -269,8 +269,8 @@ router.get('/promos/active', async (req, res) => {
 router.get('/promos', async (req, res) => {
   try {
     const filter = {};
-    if (req.user.role === 'manager') filter.createdBy = req.user._id;
-    if (req.user.role === 'client') filter.createdBy = req.user.managerId;
+    if (req.user.role === 'manager') filter.zoneIds = req.user.zoneId;
+    if (req.user.role === 'client') filter.zoneIds = req.user.zoneId;
     const promos = await Promo.find(filter).sort({ createdAt: -1 });
     res.json(promos);
   } catch (e) { res.status(500).json({ message: e.message }); }
