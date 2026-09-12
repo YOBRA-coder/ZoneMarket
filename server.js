@@ -87,6 +87,7 @@ const PickupStationSchema = new mongoose.Schema({
   location: { lat: Number, lng: Number },
   zoneId: { type: mongoose.Schema.Types.ObjectId, ref: 'Zone' },
   managerId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  isActive: { type: Boolean, default: true },
 }, { timestamps: true });
 
 const CategorySchema = new mongoose.Schema({
@@ -318,12 +319,15 @@ app.get('/api/v1/zones/nearby', auth(), async (req, res) => {
 
 // pickup-stations
 app.get('/api/v1/pickup-stations', async (req, res) => {
-  const pickupStations = await PickupStation.find().populate('zoneId', 'name').populate('managerId', 'name');
+  const filter = { isActive: false };
+  if (req.query.zoneId) filter.zoneId = req.query.zoneId;
+  const pickupStations = await PickupStation.find(filter).sort({ createdAt: -1 });
+ console.log(pickupStations);
   res.json(pickupStations);
 });
 
 app.post('/api/v1/pickup-stations', auth(['manager']), async (req, res) => {
-  const pickupStation = await PickupStation.create({ ...req.body, managerId: req.user._id, zoneId: req.user.zoneId });
+  const pickupStation = await PickupStation.create({ ...req.body, managerId: req.user._id, zoneId: req.user.zoneId, isActive: true });
   res.status(201).json(pickupStation);
 });
 
