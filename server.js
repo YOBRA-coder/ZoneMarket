@@ -734,12 +734,12 @@ app.post('/api/v1/wallet/deposit', auth(), async (req, res) => {
   const { amount, method, phone } = req.body;
   const reference = `Deposit-${Date.now()}`;
   if (method === 'mpesa') {
-    // Initiate STK push via Daraja API
-    // const stkRes = await initiateMpesaSTK(phone, amount);
-    // Save pending transaction
     try {
       if (!phone) {
         return res.status(400).json({ message: 'Phone number is required for M-Pesa deposits' });
+      }
+         if (!amount || amount <= 1) {
+        return res.status(400).json({ message: 'Amount is required for M-Pesa deposits' });
       }
       const stkRes = await stkPush(phone, amount, reference);
       const isSuccessful = stkRes?.success === true;
@@ -754,8 +754,8 @@ app.post('/api/v1/wallet/deposit', auth(), async (req, res) => {
 
   }
   // Direct deposit (bank/card after verification)
-  await User.findByIdAndUpdate(req.user._id, { $inc: { walletBalance: amount } });
-  await Transaction.create({ userId: req.user._id, type: 'deposit', amount, method, status: 'completed', description: `Deposit KSh ${amount}`, zoneId: req.user.zoneId });
+  //await User.findByIdAndUpdate(req.user._id, { $inc: { walletBalance: amount } });
+  //await Transaction.create({ userId: req.user._id, type: 'deposit', amount, method, status: 'completed', description: `Deposit KSh ${amount}`, zoneId: req.user.zoneId });
   const uForPush = await User.findById(req.user._id).select('pushToken');
   if (uForPush?.pushToken) push.notifyDepositConfirmed(uForPush.pushToken, amount);
   res.json({ success: true, newBalance: (await User.findById(req.user._id)).walletBalance });
@@ -789,7 +789,7 @@ app.post('/api/v1/wallet/mpesa/register-fee', auth(), async (req, res) => {
     // 2. Generate a Unique Internal Reference / Checkout Request ID
     // If Tuma expects you to generate it, do it here. If Tuma returns one, update it later.
     const reference = `REG-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`;
-    const stkRes = await stkPush(formattedPhone, 1, reference);
+    const stkRes = await stkPush(formattedPhone, amount, reference);
     const isSuccessful = stkRes?.success === true;
     if (!isSuccessful) {
       return res.status(400).json({ message: 'Failed to initiate M-Pesa STK Push', details: stkRes });
@@ -804,7 +804,6 @@ app.post('/api/v1/wallet/mpesa/register-fee', auth(), async (req, res) => {
 });
 
 app.post('/api/v1/wallet/mpesa/callback', async (req, res) => {
-  console.log('TUMA MPESA CALLBACK:', JSON.stringify(req.body, null, 2));
 
   // Tuma delivers payload parameters at the root level
   const { checkout_request_id, result_code, status } = req.body;
@@ -980,7 +979,7 @@ app.post('/api/v1/wallet/pay-order', auth(), async (req, res) => {
   else if (method === 'mpesa') {
     //order.total
     try {
-      const stkRes = await stkPush(phone, 1, orderId);
+      const stkRes = await stkPush(phone, order.total, orderId);
       const txn = await Transaction.create({
         userId: req.user._id,
         type: 'order_payment',
