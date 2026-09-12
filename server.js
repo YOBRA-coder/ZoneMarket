@@ -917,7 +917,7 @@ app.post('/api/v1/wallet/withdraw', auth(), async (req, res) => {
 
   const balanceField = user.role === 'admin' ? 'adminCommission' : 'walletBalance';
   await User.findByIdAndUpdate(req.user._id, { $inc: { [balanceField]: -amount } });
-  await Transaction.create({ userId: req.user._id, type: 'withdrawal', amount: -amount, method, status: 'pending', description: `Withdrawal KSh ${amount} to ${account}` });
+  await Transaction.create({ userId: req.user._id, type: 'withdrawal', amount: -amount, method, status: 'pending', description: `Withdrawal KSh ${amount} to ${account}`, zoneId: req.user.zoneId });
   res.json({ success: true, message: 'Withdrawal initiated' });
 });
 
@@ -951,6 +951,7 @@ app.post('/api/v1/wallet/pay-order', auth(), async (req, res) => {
         reference: stkRes.data.checkout_request_id,
         orderId: order._id,
         description: `M-Pesa order payment of KSh ${order.total} for order ${order.reference}`,
+        zoneId: req.user.zoneId,
       });
       res.json({
         pending: true,
