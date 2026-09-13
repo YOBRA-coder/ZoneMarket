@@ -344,6 +344,24 @@ app.post('/api/v1/pickup-stations', auth(['manager']), async (req, res) => {
   res.status(201).json(pickupStation);
 });
 
+app.delete('/api/v1/pickup-stations/:id', auth(['manager', 'admin']), async (req, res) => {
+  try {
+  await PickupStation.findByIdAndDelete(req.params.id);
+  res.json({ success: true });
+} catch (error) {
+  res.status(500).json({ message: "Internal server error" });
+}
+});
+
+app.put('/api/v1/pickup-stations/:id', auth(['manager', 'admin']), async (req, res) => {
+  try {
+    const pickupStation = await PickupStation.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    res.json(pickupStation);
+} catch (error) {
+  res.status(500).json({ message: "Internal server error" });
+}
+});
+
 
 // User changes zone (location tracking)
 app.post('/api/v1/zones/user/:userId/update-location', auth(), async (req, res) => {
