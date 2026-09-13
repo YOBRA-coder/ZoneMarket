@@ -807,13 +807,13 @@ app.post('/api/v1/wallet/mpesa/register-fee', auth(), async (req, res) => {
     // 2. Generate a Unique Internal Reference / Checkout Request ID
     // If Tuma expects you to generate it, do it here. If Tuma returns one, update it later.
     const reference = `REG-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`;
-    const stkRes = await stkPush(formattedPhone, amount, reference);
+    const stkRes = await stkPush(formattedPhone, 10, reference);
     const isSuccessful = stkRes?.success === true;
     if (!isSuccessful) {
       return res.status(400).json({ message: 'Failed to initiate M-Pesa STK Push', details: stkRes });
     }
 
-    const txn = await Transaction.create({ userId: req.user._id, type: 'registration_fee', amount, method: 'mpesa', status: 'pending', description: `M-Pesa registration fee  KSh ${amount}`, reference: stkRes.data.checkout_request_id, zoneId: req.user.zoneId });
+    const txn = await Transaction.create({ userId: req.user._id, type: 'registration_fee', amount: 10, method: 'mpesa', status: 'pending', description: `M-Pesa registration fee  KSh 10`, reference: stkRes.data.checkout_request_id, zoneId: req.user.zoneId });
     return res.json({ success: true, pending: true, transactionId: txn._id, checkoutRequestId: stkRes.data.checkout_request_id, message: 'STK Push initiated successfully. Please check your phone to complete payment.' });
   } catch (e) {
     res.status(500).json({ message: 'Error Processing transaction. Try again later.' });
